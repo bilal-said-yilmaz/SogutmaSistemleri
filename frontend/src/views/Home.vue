@@ -1,12 +1,84 @@
 <template>
   <div class="home">
-    <section id="services" class="section">
-      <h2>Hizmetlerimiz</h2>
-      <div class="services-grid">
-        <div v-for="service in services" :key="service.id" class="service-card">
-          <img :src="service.image" :alt="service.title">
-          <h3>{{ service.title }}</h3>
-          <p>{{ service.description }}</p>
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="hero-content">
+        <h1>Kozan'ın Güvenilir Klima ve Beyaz Eşya Servisi</h1>
+        <p>15 yılı aşkın tecrübemizle Kozan'da klima satış, montaj, bakım ve beyaz eşya tamiri hizmetleri sunuyoruz.</p>
+        <div class="hero-buttons">
+          <a href="#services" class="btn btn-primary">Hizmetlerimiz</a>
+          <a href="#contact" class="btn btn-secondary">İletişime Geçin</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Services Section -->
+    <section id="services" class="services">
+      <div class="container">
+        <h2>Hizmetlerimiz</h2>
+        <div class="services-grid">
+          <div class="service-card">
+            <i class="fas fa-snowflake"></i>
+            <h3>Klima Servisi Kozan</h3>
+            <p>Tüm marka klimalarınız için bakım, onarım ve montaj hizmetleri. Kozan'da aynı gün servis garantisi.</p>
+          </div>
+          <div class="service-card">
+            <i class="fas fa-tools"></i>
+            <h3>Beyaz Eşya Tamiri Kozan</h3>
+            <p>Buzdolabı, çamaşır makinesi, bulaşık makinesi tamiri. Kozan'da ev ve işyerlerine hızlı servis.</p>
+          </div>
+          <div class="service-card">
+            <i class="fas fa-temperature-low"></i>
+            <h3>Soğutma Sistemleri Kozan</h3>
+            <p>Endüstriyel soğutma sistemleri kurulum ve bakımı. Kozan'da işletmelere özel çözümler.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Why Choose Us Section -->
+    <section class="why-us">
+      <div class="container">
+        <h2>Neden Bizi Seçmelisiniz?</h2>
+        <div class="features-grid">
+          <div class="feature">
+            <i class="fas fa-clock"></i>
+            <h3>Aynı Gün Servis</h3>
+            <p>Kozan'da aynı gün içinde servis hizmeti sağlıyoruz.</p>
+          </div>
+          <div class="feature">
+            <i class="fas fa-certificate"></i>
+            <h3>Profesyonel Ekip</h3>
+            <p>Uzman ve deneyimli teknik kadromuzla kaliteli hizmet.</p>
+          </div>
+          <div class="feature">
+            <i class="fas fa-shield-alt"></i>
+            <h3>Garantili Hizmet</h3>
+            <p>Tüm tamir ve bakım işlemlerimiz garantilidir.</p>
+          </div>
+          <div class="feature">
+            <i class="fas fa-hand-holding-usd"></i>
+            <h3>Uygun Fiyat</h3>
+            <p>Kozan'da rekabetçi fiyatlarla kaliteli hizmet.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Service Areas Section -->
+    <section class="service-areas">
+      <div class="container">
+        <h2>Hizmet Bölgelerimiz</h2>
+        <div class="areas-content">
+          <p>Kozan merkez ve tüm mahallelerinde hizmet veriyoruz:</p>
+          <ul class="areas-list">
+            <li>Kozan Merkez</li>
+            <li>Mahmutlu Mahallesi</li>
+            <li>Hacıuşağı Mahallesi</li>
+            <li>Yarımoğlu Mahallesi</li>
+            <li>Çanaklı Mahallesi</li>
+            <li>Ve diğer tüm mahalleler</li>
+          </ul>
         </div>
       </div>
     </section>
@@ -36,20 +108,50 @@
 
     <section id="contact" class="section">
       <h2>İletişim</h2>
-      <div class="contact-content" v-if="contact">
+      <div class="contact-content">
         <div class="contact-info">
-          <h3>{{ contact.title }}</h3>
-          <p><i class="pi pi-phone"></i> {{ contact.phone }}</p>
-          <p><i class="pi pi-envelope"></i> {{ contact.email }}</p>
-          <p><i class="pi pi-map-marker"></i> {{ contact.address }}</p>
+          <h3>İletişim Bilgileri</h3>
+          <div class="info-item" v-if="contact">
+            <i class="pi pi-map-marker"></i>
+            <div>
+              <strong>Adres:</strong>
+              <p>{{ contact.address }}</p>
+            </div>
+          </div>
+          <div class="info-item" v-if="contact">
+            <i class="pi pi-phone"></i>
+            <div>
+              <strong>Telefon:</strong>
+              <p>{{ contact.phone }}</p>
+            </div>
+          </div>
+          <div class="info-item" v-if="contact">
+            <i class="pi pi-envelope"></i>
+            <div>
+              <strong>E-posta:</strong>
+              <p>{{ contact.email }}</p>
+            </div>
+          </div>
+          <div class="info-item">
+            <i class="pi pi-clock"></i>
+            <div>
+              <strong>Çalışma Saatleri:</strong>
+              <p>Hafta içi: {{ contact?.weekdayHours || '09:00 - 18:00' }}</p>
+              <p>Cumartesi: {{ contact?.saturdayHours || '09:00 - 14:00' }}</p>
+              <p>Pazar: {{ contact?.sundayHours || 'Kapalı' }}</p>
+            </div>
+          </div>
         </div>
-        <div class="contact-form">
-          <form @submit.prevent="submitForm">
-            <input v-model="form.name" type="text" placeholder="Adınız" required>
-            <input v-model="form.email" type="email" placeholder="E-posta" required>
-            <textarea v-model="form.message" placeholder="Mesajınız" required></textarea>
-            <button type="submit">Gönder</button>
-          </form>
+
+        <div class="map-container">
+          <iframe
+            width="100%"
+            height="100%"
+            frameborder="0"
+            style="border:0"
+            :src="`https://maps.google.com/maps?q=${contact?.latitude || '37.4538'},${contact?.longitude || '35.8158'}&z=15&output=embed`"
+            allowfullscreen
+          ></iframe>
         </div>
       </div>
     </section>
@@ -66,11 +168,6 @@ const services = ref([])
 const products = ref([])
 const about = ref(null)
 const contact = ref(null)
-const form = ref({
-  name: '',
-  email: '',
-  message: ''
-})
 
 const fetchData = async () => {
   try {
@@ -87,16 +184,6 @@ const fetchData = async () => {
     contact.value = contactRes.data
   } catch (error) {
     console.error('Veri yüklenirken hata oluştu:', error)
-  }
-}
-
-const submitForm = async () => {
-  try {
-    await axios.post('/api/contact/submit', form.value)
-    alert('Mesajınız başarıyla gönderildi!')
-    form.value = { name: '', email: '', message: '' }
-  } catch (error) {
-    alert('Mesaj gönderilirken bir hata oluştu.')
   }
 }
 
@@ -188,76 +275,65 @@ onMounted(() => {
   }
 }
 
+@media (max-width: 768px) {
+  .about-content {
+    grid-template-columns: 1fr;
+  }
+}
+
 .contact-content {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 2rem;
 
-  .contact-info {
-    h3 {
-      margin-top: 0;
-      color: #333;
-    }
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
 
-    p {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      color: #666;
-      margin: 1rem 0;
+.contact-info {
+  background: #fff;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 
-      i {
-        color: #007bff;
-      }
-    }
+  h3 {
+    margin-bottom: 2rem;
+    color: #333;
   }
 
-  .contact-form {
-    form {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
+  .info-item {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
 
-      input,
-      textarea {
-        padding: 0.8rem;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        font-size: 1rem;
+    i {
+      font-size: 1.5rem;
+      color: #007bff;
+      margin-right: 1rem;
+      margin-top: 0.25rem;
+    }
 
-        &:focus {
-          outline: none;
-          border-color: #007bff;
-        }
+    div {
+      strong {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: #333;
       }
 
-      textarea {
-        min-height: 150px;
-        resize: vertical;
-      }
-
-      button {
-        padding: 0.8rem;
-        background: #007bff;
-        color: #fff;
-        border: none;
-        border-radius: 4px;
-        font-size: 1rem;
-        cursor: pointer;
-        transition: background 0.3s;
-
-        &:hover {
-          background: #0056b3;
-        }
+      p {
+        color: #666;
+        margin: 0;
+        line-height: 1.4;
       }
     }
   }
 }
 
-@media (max-width: 768px) {
-  .about-content,
-  .contact-content {
-    grid-template-columns: 1fr;
-  }
+.map-container {
+  height: 400px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 </style> 

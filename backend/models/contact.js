@@ -19,6 +19,26 @@ module.exports = (sequelize) => {
     },
     address: {
       type: DataTypes.TEXT
+    },
+    latitude: {
+      type: DataTypes.FLOAT,
+      defaultValue: 37.4538
+    },
+    longitude: {
+      type: DataTypes.FLOAT,
+      defaultValue: 35.8158
+    },
+    weekdayHours: {
+      type: DataTypes.STRING,
+      defaultValue: '09:00 - 18:00'
+    },
+    saturdayHours: {
+      type: DataTypes.STRING,
+      defaultValue: '09:00 - 14:00'
+    },
+    sundayHours: {
+      type: DataTypes.STRING,
+      defaultValue: 'Kapalı'
     }
   });
 }; 

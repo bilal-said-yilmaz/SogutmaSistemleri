@@ -4,15 +4,31 @@ const multer = require('multer');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
-const { sequelize, Product, Service, About, Contact } = require('./models');
+const { sequelize, Product, Service, About, Contact, Hero, Footer } = require('./models');
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 
 // CORS ayarları
-app.use(cors());
-app.use(express.json());
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'http://admin.localhost:5173',
+    'http://klimakozan.com',
+    'https://klimakozan.com',
+    'http://www.klimakozan.com',
+    'https://www.klimakozan.com',
+    'http://admin.klimakozan.com',
+    'https://admin.klimakozan.com'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+// Body parser limit ayarı
+app.use(express.json({limit: '50mb'}));
+app.use(express.urlencoded({limit: '50mb', extended: true}));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // JWT secret key
@@ -62,7 +78,7 @@ const authenticateToken = (req, res, next) => {
 };
 
 // Login endpoint
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
   
   if (username === 'admin' && password === 'admin123') {
@@ -298,6 +314,70 @@ app.post('/api/contact/submit', (req, res) => {
     res.status(500).json({ message: 'Mesajınız gönderilirken bir hata oluştu' });
   }
 });
+
+// Hero section endpoints
+app.get('/api/admin/hero', authenticateToken, async (req, res) => {
+  try {
+    const hero = await Hero.findOne()
+    res.json(hero || {
+      subheading: 'Klima Kozan\'a Hoş Geldiniz',
+      heading: 'Profesyonel Klima ve Beyaz Eşya Çözümleri',
+      buttonText: 'Hizmetlerimizi Keşfedin',
+      backgroundImage: ''
+    })
+  } catch (error) {
+    res.status(500).json({ error: 'Sunucu hatası' })
+  }
+})
+
+app.put('/api/admin/hero', authenticateToken, async (req, res) => {
+  try {
+    const hero = await Hero.findOne()
+    if (hero) {
+      await Hero.findByIdAndUpdate(hero._id, req.body)
+    } else {
+      await Hero.create(req.body)
+    }
+    res.json({ message: 'Hero güncellendi' })
+  } catch (error) {
+    res.status(500).json({ error: 'Sunucu hatası' })
+  }
+})
+
+// Footer endpoints
+app.get('/api/admin/footer', authenticateToken, async (req, res) => {
+  try {
+    const footer = await Footer.findOne()
+    res.json(footer || {
+      copyright: 'Copyright © Klima Kozan 2024',
+      socialLinks: {
+        twitter: '#',
+        facebook: '#',
+        instagram: '#'
+      },
+      links: {
+        privacy: 'Gizlilik Politikası',
+        terms: 'Kullanım Şartları'
+      }
+    })
+  } catch (error) {
+    res.status(500).json({ error: 'Sunucu hatası' })
+  }
+})
+
+app.put('/api/admin/footer', authenticateToken, async (req, res) => {
+  try {
+    const footer = await Footer.findOne()
+    if (footer) {
+      await Footer.findByIdAndUpdate(footer._id, req.body)
+    } else {
+      await Footer.create(req.body)
+    }
+    res.json({ message: 'Footer güncellendi' })
+  } catch (error) {
+    res.status(500).json({ error: 'Sunucu hatası' })
+  }
+})
 
 // Uploads klasörünü oluştur
 const uploadsDir = path.join(__dirname, 'uploads');

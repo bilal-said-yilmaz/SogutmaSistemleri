@@ -1,0 +1,124 @@
+/* Global Styles */
+:root {
+  --primary-color: #1e3a8a;
+  --secondary-color: #fff;
+  --text-color: #333;
+  --light-text: #6c757d;
+  --white: #fff;
+  --hover-color: #2563eb;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Roboto', sans-serif;
+  line-height: 1.6;
+  color: var(--text-color);
+}
+
+/* Buttons */
+.btn-primary {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+  color: var(--secondary-color);
+  font-weight: 600;
+  padding: 1.25rem 2.5rem;
+  font-size: 1.125rem;
+  text-transform: uppercase;
+}
+
+.btn-primary:hover {
+  background-color: #fec810;
+  border-color: #fec810;
+}
+
+.btn-xl {
+  padding: 1.25rem 2.5rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* Animations */
+.fade-in {
+  animation: fadeIn 1s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Sections */
+.page-section {
+  padding: 6rem 0;
+}
+
+.page-section h2.section-heading {
+  font-size: 2.5rem;
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.page-section h3.section-subheading {
+  font-size: 1rem;
+  font-weight: 400;
+  font-style: italic;
+  margin-bottom: 4rem;
+  color: var(--light-text);
+}
+
+/* Portfolio/Products Grid */
+.portfolio-item {
+  margin-bottom: 2rem;
+}
+
+.portfolio-item .portfolio-link {
+  position: relative;
+  display: block;
+  margin: 0 auto;
+}
+
+.portfolio-item .portfolio-hover {
+  display: flex;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: rgba(254, 209, 54, 0.9);
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity ease-in-out 0.25s;
+}
+
+.portfolio-item .portfolio-hover:hover {
+  opacity: 1;
+}
+
+.portfolio-item .portfolio-hover-content {
+  color: white;
+}
+
+.portfolio-item .portfolio-caption {
+  padding: 1.5rem;
+  text-align: center;
+  background-color: var(--white);
+}
+
+.portfolio-item .portfolio-caption-heading {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0;
+}
+
+.portfolio-item .portfolio-caption-subheading {
+  font-style: italic;
+} 

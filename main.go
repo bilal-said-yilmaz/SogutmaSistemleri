@@ -6,95 +6,107 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"kozan/db"
 	"kozan/models"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/joho/godotenv"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func main() {
-	// .env dosyasını yükle
-	if err := godotenv.Load(); err != nil {
-		log.Println("Warning: .env file not found")
+	// Load .env file
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
 	}
 
-	// Veritabanı bağlantısını başlat
+	// Initialize database
 	db.InitDB()
 
-	// Uploads klasörünü oluştur
+	// Initialize Gin
+	r := gin.Default()
+
+	// Static file server
+	r.Static("/uploads", "./uploads")
 	if err := os.MkdirAll("uploads", 0755); err != nil {
 		log.Fatal(err)
 	}
 
-	// Gin router'ı oluştur
-	r := gin.Default()
+	// CORS configuration
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:5173", "http://admin.localhost:5173"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
-	// Statik dosya sunucusu
-	r.Static("/uploads", "./uploads")
-
-	// CORS ayarları
-	r.Use(func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-
-		c.Next()
+	// Options handler for CORS preflight requests
+	r.OPTIONS("/*path", func(c *gin.Context) {
+		c.Status(204)
 	})
 
-	// API rotaları
-	api := r.Group("/api")
+	// Public routes
+	r.POST("/api/auth/login", loginHandler)
+
+	// Admin routes (protected)
+	admin := r.Group("/api/admin")
+	admin.Use(authMiddleware())
 	{
-		// Auth rotaları
-		auth := api.Group("/auth")
-		{
-			auth.POST("/login", loginHandler)
-		}
+		// Products
+		admin.GET("/products", getProductsHandler)
+		admin.POST("/products", createProductHandler)
+		admin.PUT("/products/:id", updateProductHandler)
+		admin.DELETE("/products/:id", deleteProductHandler)
 
-		// Admin rotaları
-		admin := api.Group("/admin")
-		admin.Use(authMiddleware())
-		{
-			// Dosya yükleme
-			admin.POST("/upload", uploadHandler)
+		// Services
+		admin.GET("/services", getServicesHandler)
+		admin.POST("/services", createServiceHandler)
+		admin.PUT("/services/:id", updateServiceHandler)
+		admin.DELETE("/services/:id", deleteServiceHandler)
 
-			// Ürünler
-			admin.GET("/products", getProductsHandler)
-			admin.POST("/products", createProductHandler)
-			admin.PUT("/products/:id", updateProductHandler)
-			admin.DELETE("/products/:id", deleteProductHandler)
+		// About
+		admin.GET("/about", getAboutHandler)
+		admin.PUT("/about", updateAboutHandler)
 
-			// Hizmetler
-			admin.GET("/services", getServicesHandler)
-			admin.POST("/services", createServiceHandler)
-			admin.PUT("/services/:id", updateServiceHandler)
-			admin.DELETE("/services/:id", deleteServiceHandler)
+		// Contact
+		admin.GET("/contact", getContactHandler)
+		admin.PUT("/contact", updateContactHandler)
 
-			// Hakkımızda
-			admin.GET("/about", getAboutHandler)
-			admin.PUT("/about", updateAboutHandler)
+		// Hero
+		admin.GET("/hero", getHeroHandler)
+		admin.PUT("/hero", updateHeroHandler)
 
-			// İletişim
-			admin.GET("/contact", getContactHandler)
-			admin.PUT("/contact", updateContactHandler)
-		}
+		// Footer
+		admin.GET("/footer", getFooterHandler)
+		admin.PUT("/footer", updateFooterHandler)
 
-		// Public rotaları
-		api.GET("/products", getPublicProductsHandler)
-		api.GET("/services", getPublicServicesHandler)
-		api.GET("/about", getPublicAboutHandler)
-		api.GET("/contact", getPublicContactHandler)
+		// Users routes
+		admin.GET("/users", getUsersHandler)
+		admin.POST("/users", createUserHandler)
+		admin.PUT("/users/:id", updateUserHandler)
+		admin.DELETE("/users/:id", deleteUserHandler)
 	}
 
-	// Sunucuyu başlat
+	// Public API routes
+	api := r.Group("/api")
+	{
+		api.GET("/products", getProductsHandler)
+		api.GET("/services", getServicesHandler)
+		api.GET("/about", getAboutHandler)
+		api.GET("/contact", getContactHandler)
+		api.GET("/hero", getHeroHandler)
+		api.GET("/footer", getFooterHandler)
+	}
+
+	// Start server
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -110,60 +122,87 @@ func loginHandler(c *gin.Context) {
 	}
 
 	if err := c.BindJSON(&loginData); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz istek"})
 		return
 	}
 
 	var user models.User
-	err := db.DB.QueryRow(
-		"SELECT id, username FROM users WHERE username = $1 AND password = $2",
-		loginData.Username,
-		loginData.Password,
-	).Scan(&user.ID, &user.Username)
+	var hashedPassword string
+	err := db.DB.QueryRow("SELECT id, username, password, role_id FROM users WHERE username = $1", loginData.Username).
+		Scan(&user.ID, &user.Username, &hashedPassword, &user.RoleID)
 
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Kullanıcı adı veya şifre hatalı"})
+		return
+	}
+
+	// Şifre kontrolü
+	err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(loginData.Password))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Kullanıcı adı veya şifre hatalı"})
 		return
 	}
 
 	// JWT token oluştur
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id":  user.ID,
 		"username": user.Username,
+		"user_id":  user.ID,
+		"role_id":  user.RoleID,
+		"exp":      time.Now().Add(time.Hour * 24).Unix(),
 	})
 
 	tokenString, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate token"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Token oluşturulamadı"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"token": tokenString,
-		"user":  user,
+		"user": gin.H{
+			"id":       user.ID,
+			"username": user.Username,
+			"role_id":  user.RoleID,
+		},
 	})
 }
 
 func authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		tokenString := c.GetHeader("Authorization")
-		if tokenString == "" {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "No token provided"})
 			c.Abort()
 			return
 		}
 
+		// "Bearer " prefix'ini kaldır
+		tokenString := authHeader
+		if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+			tokenString = authHeader[7:]
+		}
+
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
 			return []byte(os.Getenv("JWT_SECRET")), nil
 		})
 
-		if err != nil || !token.Valid {
+		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			c.Abort()
 			return
 		}
 
-		c.Next()
+		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+			c.Set("username", claims["username"])
+			c.Next()
+		} else {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+			c.Abort()
+			return
+		}
 	}
 }
 
@@ -408,8 +447,8 @@ func updateAboutHandler(c *gin.Context) {
 // İletişim işlemleri
 func getContactHandler(c *gin.Context) {
 	var contact models.Contact
-	err := db.DB.QueryRow("SELECT id, title, phone, email, address FROM contact ORDER BY id LIMIT 1").
-		Scan(&contact.ID, &contact.Title, &contact.Phone, &contact.Email, &contact.Address)
+	err := db.DB.QueryRow("SELECT id, title, phone, email, address, weekday_hours, saturday_hours, sunday_hours FROM contact ORDER BY id LIMIT 1").
+		Scan(&contact.ID, &contact.Title, &contact.Phone, &contact.Email, &contact.Address, &contact.WeekdayHours, &contact.SaturdayHours, &contact.SundayHours)
 
 	if err != nil {
 		c.JSON(http.StatusOK, models.Contact{}) // Veri yoksa boş döndür
@@ -431,14 +470,14 @@ func updateContactHandler(c *gin.Context) {
 	if err != nil {
 		// Kayıt yoksa yeni ekle
 		err = db.DB.QueryRow(
-			"INSERT INTO contact (title, phone, email, address) VALUES ($1, $2, $3, $4) RETURNING id",
-			contact.Title, contact.Phone, contact.Email, contact.Address,
+			"INSERT INTO contact (title, phone, email, address, weekday_hours, saturday_hours, sunday_hours) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+			contact.Title, contact.Phone, contact.Email, contact.Address, contact.WeekdayHours, contact.SaturdayHours, contact.SundayHours,
 		).Scan(&contact.ID)
 	} else {
 		// Varolan kaydı güncelle
 		_, err = db.DB.Exec(
-			"UPDATE contact SET title = $1, phone = $2, email = $3, address = $4 WHERE id = $5",
-			contact.Title, contact.Phone, contact.Email, contact.Address, existingID,
+			"UPDATE contact SET title = $1, phone = $2, email = $3, address = $4, weekday_hours = $5, saturday_hours = $6, sunday_hours = $7 WHERE id = $8",
+			contact.Title, contact.Phone, contact.Email, contact.Address, contact.WeekdayHours, contact.SaturdayHours, contact.SundayHours, existingID,
 		)
 		contact.ID = existingID
 	}
@@ -489,4 +528,144 @@ func uploadHandler(c *gin.Context) {
 	// Dosya URL'ini döndür
 	fileURL := fmt.Sprintf("/uploads/%s", filename)
 	c.JSON(http.StatusOK, gin.H{"url": fileURL})
+}
+
+func getHeroHandler(c *gin.Context) {
+	// Implementation of getHeroHandler
+}
+
+func updateHeroHandler(c *gin.Context) {
+	// Implementation of updateHeroHandler
+}
+
+func getFooterHandler(c *gin.Context) {
+	// Implementation of getFooterHandler
+}
+
+func updateFooterHandler(c *gin.Context) {
+	// Implementation of updateFooterHandler
+}
+
+// Users endpoints
+func getUsersHandler(c *gin.Context) {
+	rows, err := db.DB.Query("SELECT id, username, phone, role_id FROM users")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	var users []models.User
+	for rows.Next() {
+		var u models.User
+		if err := rows.Scan(&u.ID, &u.Username, &u.Phone, &u.RoleID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		users = append(users, u)
+	}
+
+	c.JSON(http.StatusOK, users)
+}
+
+func createUserHandler(c *gin.Context) {
+	var user models.User
+	if err := c.BindJSON(&user); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Hash password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Şifre işlenirken hata oluştu"})
+		return
+	}
+
+	// Insert user
+	err = db.DB.QueryRow(
+		"INSERT INTO users (username, phone, password, role_id) VALUES ($1, $2, $3, $4) RETURNING id",
+		user.Username, user.Phone, string(hashedPassword), user.RoleID,
+	).Scan(&user.ID)
+
+	if err != nil {
+		if strings.Contains(err.Error(), "unique constraint") {
+			if strings.Contains(err.Error(), "username") {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Bu kullanıcı adı zaten kullanımda"})
+			} else if strings.Contains(err.Error(), "phone") {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Bu telefon numarası zaten kayıtlı"})
+			} else {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Benzersiz alan çakışması"})
+			}
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Clear password before sending response
+	user.Password = ""
+	c.JSON(http.StatusCreated, user)
+}
+
+func updateUserHandler(c *gin.Context) {
+	id := c.Param("id")
+	var user models.User
+	if err := c.BindJSON(&user); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	query := "UPDATE users SET username = $1, phone = $2, role_id = $3 WHERE id = $4"
+	result, err := db.DB.Exec(query, user.Username, user.Phone, user.RoleID, id)
+	if err != nil {
+		if strings.Contains(err.Error(), "unique constraint") {
+			if strings.Contains(err.Error(), "username") {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Bu kullanıcı adı zaten kullanımda"})
+			} else if strings.Contains(err.Error(), "phone") {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Bu telefon numarası zaten kayıtlı"})
+			} else {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Benzersiz alan çakışması"})
+			}
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if rowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Kullanıcı bulunamadı"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Kullanıcı güncellendi"})
+}
+
+func deleteUserHandler(c *gin.Context) {
+	id := c.Param("id")
+
+	result, err := db.DB.Exec("DELETE FROM users WHERE id = $1", id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if rowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Kullanıcı bulunamadı"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Kullanıcı silindi"})
 }
