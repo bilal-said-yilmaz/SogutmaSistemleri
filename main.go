@@ -102,8 +102,6 @@ func main() {
 		api.GET("/services", getServicesHandler)
 		api.GET("/about", getAboutHandler)
 		api.GET("/contact", getContactHandler)
-		api.GET("/hero", getHeroHandler)
-		api.GET("/footer", getFooterHandler)
 	}
 
 	// Start server
@@ -447,8 +445,8 @@ func updateAboutHandler(c *gin.Context) {
 // İletişim işlemleri
 func getContactHandler(c *gin.Context) {
 	var contact models.Contact
-	err := db.DB.QueryRow("SELECT id, title, phone, email, address, weekday_hours, saturday_hours, sunday_hours FROM contact ORDER BY id LIMIT 1").
-		Scan(&contact.ID, &contact.Title, &contact.Phone, &contact.Email, &contact.Address, &contact.WeekdayHours, &contact.SaturdayHours, &contact.SundayHours)
+	err := db.DB.QueryRow("SELECT id, title, email, address, weekday_hours, saturday_hours, sunday_hours FROM contact ORDER BY id LIMIT 1").
+		Scan(&contact.ID, &contact.Title, &contact.Email, &contact.Address, &contact.WeekdayHours, &contact.SaturdayHours, &contact.SundayHours)
 
 	if err != nil {
 		c.JSON(http.StatusOK, models.Contact{}) // Veri yoksa boş döndür
@@ -470,14 +468,14 @@ func updateContactHandler(c *gin.Context) {
 	if err != nil {
 		// Kayıt yoksa yeni ekle
 		err = db.DB.QueryRow(
-			"INSERT INTO contact (title, phone, email, address, weekday_hours, saturday_hours, sunday_hours) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
-			contact.Title, contact.Phone, contact.Email, contact.Address, contact.WeekdayHours, contact.SaturdayHours, contact.SundayHours,
+			"INSERT INTO contact (title, email, address, weekday_hours, saturday_hours, sunday_hours) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+			contact.Title, contact.Email, contact.Address, contact.WeekdayHours, contact.SaturdayHours, contact.SundayHours,
 		).Scan(&contact.ID)
 	} else {
 		// Varolan kaydı güncelle
 		_, err = db.DB.Exec(
-			"UPDATE contact SET title = $1, phone = $2, email = $3, address = $4, weekday_hours = $5, saturday_hours = $6, sunday_hours = $7 WHERE id = $8",
-			contact.Title, contact.Phone, contact.Email, contact.Address, contact.WeekdayHours, contact.SaturdayHours, contact.SundayHours, existingID,
+			"UPDATE contact SET title = $1, email = $2, address = $3, weekday_hours = $4, saturday_hours = $5, sunday_hours = $6 WHERE id = $7",
+			contact.Title, contact.Email, contact.Address, contact.WeekdayHours, contact.SaturdayHours, contact.SundayHours, existingID,
 		)
 		contact.ID = existingID
 	}
@@ -548,7 +546,7 @@ func updateFooterHandler(c *gin.Context) {
 
 // Users endpoints
 func getUsersHandler(c *gin.Context) {
-	rows, err := db.DB.Query("SELECT id, username, phone, role_id FROM users")
+	rows, err := db.DB.Query("SELECT id, username, email, role_id FROM users")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -558,7 +556,7 @@ func getUsersHandler(c *gin.Context) {
 	var users []models.User
 	for rows.Next() {
 		var u models.User
-		if err := rows.Scan(&u.ID, &u.Username, &u.Phone, &u.RoleID); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.Email, &u.RoleID); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -570,81 +568,113 @@ func getUsersHandler(c *gin.Context) {
 
 func createUserHandler(c *gin.Context) {
 	var user models.User
-	if err := c.BindJSON(&user); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := c.ShouldBindJSON(&user); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz kullanıcı verisi"})
 		return
 	}
 
-	// Hash password
+	// Zorunlu alanları kontrol et
+	if user.Username == "" || user.Email == "" || user.Password == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Kullanıcı adı, e-posta ve şifre zorunludur"})
+		return
+	}
+
+	// Varsayılan role_id değerini ayarla
+	if user.RoleID == 0 {
+		user.RoleID = 2 // Varsayılan kullanıcı rolü
+	}
+
+	// Şifreyi hashle
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Şifre işlenirken hata oluştu"})
 		return
 	}
 
-	// Insert user
+	// Kullanıcıyı veritabanına ekle
 	err = db.DB.QueryRow(
-		"INSERT INTO users (username, phone, password, role_id) VALUES ($1, $2, $3, $4) RETURNING id",
-		user.Username, user.Phone, string(hashedPassword), user.RoleID,
+		"INSERT INTO users (username, email, password, role_id) VALUES ($1, $2, $3, $4) RETURNING id",
+		user.Username, user.Email, string(hashedPassword), user.RoleID,
 	).Scan(&user.ID)
 
 	if err != nil {
-		if strings.Contains(err.Error(), "unique constraint") {
-			if strings.Contains(err.Error(), "username") {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Bu kullanıcı adı zaten kullanımda"})
-			} else if strings.Contains(err.Error(), "phone") {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Bu telefon numarası zaten kayıtlı"})
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+			if strings.Contains(err.Error(), "users_username_key") {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Bu kullanıcı adı zaten kullanılıyor"})
+			} else if strings.Contains(err.Error(), "users_email_key") {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Bu e-posta adresi zaten kullanılıyor"})
 			} else {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Benzersiz alan çakışması"})
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Bu bilgiler zaten kullanılıyor"})
 			}
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Kullanıcı oluşturulurken hata oluştu: " + err.Error()})
 		return
 	}
 
-	// Clear password before sending response
+	// Şifreyi response'dan temizle
 	user.Password = ""
 	c.JSON(http.StatusCreated, user)
 }
 
 func updateUserHandler(c *gin.Context) {
 	id := c.Param("id")
+	userID, err := strconv.Atoi(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz kullanıcı ID"})
+		return
+	}
+
+	var updateData struct {
+		Username string `json:"username"`
+		Email    string `json:"email"`
+		RoleID   int    `json:"role_id"`
+	}
+
+	if err := c.ShouldBindJSON(&updateData); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz güncelleme verisi"})
+		return
+	}
+
+	// Mevcut kullanıcıyı kontrol et
 	var user models.User
-	if err := c.BindJSON(&user); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	query := "UPDATE users SET username = $1, phone = $2, role_id = $3 WHERE id = $4"
-	result, err := db.DB.Exec(query, user.Username, user.Phone, user.RoleID, id)
+	err = db.DB.QueryRow("SELECT id, username, email, role_id FROM users WHERE id = $1", userID).
+		Scan(&user.ID, &user.Username, &user.Email, &user.RoleID)
 	if err != nil {
-		if strings.Contains(err.Error(), "unique constraint") {
-			if strings.Contains(err.Error(), "username") {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Bu kullanıcı adı zaten kullanımda"})
-			} else if strings.Contains(err.Error(), "phone") {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Bu telefon numarası zaten kayıtlı"})
-			} else {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Benzersiz alan çakışması"})
-			}
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	if rowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Kullanıcı bulunamadı"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Kullanıcı güncellendi"})
+	// Kullanıcıyı güncelle
+	_, err = db.DB.Exec(
+		"UPDATE users SET username = $1, email = $2, role_id = $3 WHERE id = $4",
+		updateData.Username, updateData.Email, updateData.RoleID, userID,
+	)
+
+	if err != nil {
+		if strings.Contains(err.Error(), "unique constraint") {
+			if strings.Contains(err.Error(), "users_username_key") {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Bu kullanıcı adı zaten kullanılıyor"})
+			} else if strings.Contains(err.Error(), "users_email_key") {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Bu e-posta adresi zaten kullanılıyor"})
+			} else {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Bu bilgiler zaten kullanılıyor"})
+			}
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Kullanıcı güncellenirken hata oluştu"})
+		return
+	}
+
+	// Güncellenmiş kullanıcı bilgilerini getir
+	err = db.DB.QueryRow("SELECT id, username, email, role_id FROM users WHERE id = $1", userID).
+		Scan(&user.ID, &user.Username, &user.Email, &user.RoleID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Güncellenmiş kullanıcı bilgileri alınamadı"})
+		return
+	}
+
+	c.JSON(http.StatusOK, user)
 }
 
 func deleteUserHandler(c *gin.Context) {

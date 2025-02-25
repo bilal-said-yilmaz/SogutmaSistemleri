@@ -1,16 +1,18 @@
 <template>
   <div id="app">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Top Contact Bar -->
     <div class="top-contact-bar" v-if="!isAdminSite">
       <div class="container">
         <div class="contact-buttons">
-          <a href="https://wa.me/+905385153191" target="_blank" class="contact-button whatsapp-button">
+          <a :href="'https://wa.me/' + (contact?.phone?.replace(/\D/g, '') || '+905385153191')" target="_blank" class="contact-button whatsapp-button">
             <i class="fab fa-whatsapp"></i>
             WhatsApp'tan Ulaşın
           </a>
-          <a href="tel:+905385153191" class="contact-button call-button">
+          <a :href="'tel:' + (contact?.phone || '+905385153191')" class="contact-button call-button">
             <i class="fas fa-phone-alt"></i>
-            +90 (538) 515 3191
+            {{ contact?.phone || '+90 (538) 515 3191' }}
           </a>
         </div>
       </div>
@@ -19,36 +21,40 @@
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark fixed-top" id="mainNav" :class="{ 'admin-nav': isAdminSite }">
       <div class="container">
-        <a class="navbar-brand" :href="isAdminSite ? mainSiteUrl : '/'">
+        <a class="navbar-brand" :href="isAdminSite ? mainSiteUrl : '/'" :target="isAdminSite ? '_blank' : '_self'" :rel="isAdminSite ? 'noopener noreferrer' : ''">
           <img :src="logo" alt="Klima Kozan Logo">
           <span class="brand-text">KOZAN İKLİMLENDİRME</span>
         </a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarResponsive">
-          <span class="navbar-toggler-icon"></span>
+        <button 
+          class="navbar-toggler" 
+          type="button" 
+          @click="toggleMenu"
+          :class="{ 'collapsed': !isMenuOpen }"
+        >
+          <i class="fas" :class="isMenuOpen ? 'fa-xmark' : 'fa-bars-staggered'"></i>
         </button>
         <div class="collapse navbar-collapse" id="navbarResponsive">
           <ul class="navbar-nav text-uppercase ms-auto py-4 py-lg-0">
             <li class="nav-item">
-              <a class="nav-link" :href="mainSiteUrl" target="_blank" rel="noopener noreferrer" v-if="isAdminSite">Ana Sayfa</a>
-              <router-link class="nav-link" to="/" v-else>Ana Sayfa</router-link>
+              <a class="nav-link" :href="mainSiteUrl" target="_blank" rel="noopener noreferrer" v-if="isAdminSite" @click="closeMenu">Ana Sayfa</a>
+              <router-link class="nav-link" to="/" v-else @click="closeMenu">Ana Sayfa</router-link>
             </li>
             <template v-if="$route.name === 'home'">
               <li class="nav-item">
-                <a class="nav-link" href="#services">Hizmetler</a>
+                <a class="nav-link" href="#services" @click="closeMenu">Hizmetler</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="#products">Ürünler</a>
+                <a class="nav-link" href="#products" @click="closeMenu">Ürünler</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="#about">Hakkımızda</a>
+                <a class="nav-link" href="#about" @click="closeMenu">Hakkımızda</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="#contact">İletişim</a>
+                <a class="nav-link" href="#contact" @click="closeMenu">İletişim</a>
               </li>
             </template>
-            <!-- Admin sitesinde ve giriş yapmış kullanıcı için çıkış butonu -->
             <li class="nav-item" v-if="isAdminSite && isAuthenticated">
-              <a class="nav-link" href="#" @click.prevent="handleLogout">
+              <a class="nav-link" href="#" @click.prevent="handleLogout(); closeMenu()">
                 <i class="fas fa-sign-out-alt me-1"></i>
                 Çıkış Yap
               </a>
@@ -60,17 +66,53 @@
 
     <!-- Main Content -->
     <router-view></router-view>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container">
+        <div class="row">
+          <div class="col-md-4 footer-section">
+            <h3>Kozan İklimlendirme</h3>
+            <p>15 yılı aşkın tecrübemizle Kozan'da profesyonel klima ve beyaz eşya servisi hizmeti veriyoruz.</p>
+          </div>
+          <div class="col-md-4 footer-section">
+            <h3>Hızlı Linkler</h3>
+            <ul class="list-unstyled">
+              <li><a href="#services"><i class="fas fa-chevron-right"></i>Hizmetlerimiz</a></li>
+              <li><a href="#products"><i class="fas fa-chevron-right"></i>Ürünlerimiz</a></li>
+              <li><a href="#about"><i class="fas fa-chevron-right"></i>Hakkımızda</a></li>
+              <li><a href="#contact"><i class="fas fa-chevron-right"></i>İletişim</a></li>
+            </ul>
+          </div>
+          <div class="col-md-4 footer-section">
+            <h3>İletişim</h3>
+            <ul class="list-unstyled">
+              <li><i class="fas fa-phone"></i>{{ contact?.phone || '+90 (538) 515 3191' }}</li>
+              <li><i class="fas fa-envelope"></i>{{ contact?.email || 'kozaniklimlendirme@gmail.com' }}</li>
+              <li><i class="fas fa-map-marker-alt"></i>{{ contact?.address || 'Kozan, Adana' }}</li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer-bottom text-center mt-4">
+          <p>&copy; {{ new Date().getFullYear() }} Kozan İklimlendirme. Tüm hakları saklıdır.</p>
+        </div>
+      </div>
+    </footer>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
+import { Collapse } from 'bootstrap'
 import logo from './assets/logo.png'
+import axios from 'axios'
 
 const store = useStore()
 const router = useRouter()
+const isMenuOpen = ref(false)
+const contact = ref(null)
 
 const isAuthenticated = computed(() => store.state.isAuthenticated)
 const isAdminSite = computed(() => store.state.isAdminSite)
@@ -85,6 +127,39 @@ const handleLogout = () => {
   store.dispatch('logout')
   // Login sayfasına yönlendir
   router.push('/login')
+}
+
+const toggleMenu = () => {
+  const navbarCollapse = document.getElementById('navbarResponsive')
+  if (navbarCollapse) {
+    if (isMenuOpen.value) {
+      // Menü açıksa kapat
+      navbarCollapse.classList.remove('show')
+      isMenuOpen.value = false
+      document.body.style.overflow = 'auto'
+    } else {
+      // Menü kapalıysa aç
+      navbarCollapse.classList.add('show')
+      isMenuOpen.value = true
+      if (window.innerWidth < 992) {
+        document.body.style.overflow = 'hidden'
+      }
+    }
+  }
+}
+
+const closeMenu = () => {
+  const navbarCollapse = document.getElementById('navbarResponsive')
+  if (navbarCollapse) {
+    navbarCollapse.classList.remove('show')
+    isMenuOpen.value = false
+    document.body.style.overflow = 'auto'
+  }
+}
+
+// Sayfa değiştiğinde menüyü kapat
+const handleNavigation = () => {
+  closeMenu()
 }
 
 // Navbar scroll effect
@@ -118,28 +193,94 @@ const handleScroll = () => {
   })
 }
 
+// Fetch contact data
+const fetchContact = async () => {
+  try {
+    const response = await axios.get('/api/contact')
+    contact.value = response.data
+  } catch (error) {
+    console.error('İletişim bilgileri yüklenirken hata oluştu:', error)
+  }
+}
+
 onMounted(() => {
   window.addEventListener('scroll', handleScroll)
-  // Sayfa yüklendiğinde de kontrol et
   handleScroll()
+  fetchContact()
+  
+  // Collapse olaylarını dinle
+  const navbarCollapse = document.getElementById('navbarResponsive')
+  if (navbarCollapse) {
+    navbarCollapse.addEventListener('show.bs.collapse', () => {
+      isMenuOpen.value = true
+      if (window.innerWidth < 992) {
+        document.body.style.overflow = 'hidden'
+      }
+    })
+    
+    navbarCollapse.addEventListener('hide.bs.collapse', () => {
+      isMenuOpen.value = false
+      document.body.style.overflow = 'auto'
+    })
+    
+    // Link tıklamalarını dinle
+    const navLinks = navbarCollapse.querySelectorAll('.nav-link')
+    navLinks.forEach(link => {
+      link.addEventListener('click', () => {
+        if (window.innerWidth < 992) {
+          navbarCollapse.classList.remove('show')
+          isMenuOpen.value = false
+          document.body.style.overflow = 'auto'
+        }
+      })
+    })
+  }
+
+  // Sayfa değişikliklerini dinle
+  window.addEventListener('hashchange', handleNavigation)
+  
+  // Ekran boyutu değişikliklerini dinle
+  window.addEventListener('resize', () => {
+    if (window.innerWidth >= 992 && isMenuOpen.value) {
+      closeMenu()
+    }
+  })
 })
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
+  window.removeEventListener('hashchange', handleNavigation)
+  window.removeEventListener('resize', () => {})
+  
+  // Event listener'ları temizle
+  const navbarCollapse = document.getElementById('navbarResponsive')
+  if (navbarCollapse) {
+    navbarCollapse.removeEventListener('show.bs.collapse', () => {})
+    navbarCollapse.removeEventListener('hide.bs.collapse', () => {})
+    
+    // Link event listener'larını temizle
+    const navLinks = navbarCollapse.querySelectorAll('.nav-link')
+    navLinks.forEach(link => {
+      link.removeEventListener('click', () => {})
+    })
+  }
 })
 </script>
 
 <style>
 #app {
   font-family: 'Roboto', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Navigation */
 #mainNav {
   padding: 0;
-  background-color: rgba(33, 37, 41, 0.98);
+  background-color: #000000;
   backdrop-filter: blur(10px);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
   transition: all 0.3s ease-in-out;
   top: 0;
   height: 70px;
@@ -177,16 +318,44 @@ onUnmounted(() => {
 }
 
 #mainNav .navbar-brand .brand-text {
+  font-family: 'Montserrat', sans-serif;
   font-size: 1.4rem;
   white-space: nowrap;
-  color: #1e90ff;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.15);
   font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 1) 0%, rgba(240, 240, 240, 0.9) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+#mainNav .navbar-brand .brand-text::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+#mainNav .navbar-brand:hover .brand-text {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 1) 0%, rgba(230, 230, 230, 0.95) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  transform: translateY(-1px);
+  text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.2);
 }
 
 #mainNav .navbar-nav .nav-item .nav-link {
   font-size: 1rem;
-  color: #1e90ff;
+  color: #fff;
   letter-spacing: 0.0625em;
   padding: 1.25rem 1rem;
   position: relative;
@@ -200,7 +369,7 @@ onUnmounted(() => {
   left: 1rem;
   right: 1rem;
   height: 2px;
-  background: #1e90ff;
+  background: #fff;
   transform: scaleX(0);
   transition: transform 0.3s ease-in-out;
   transform-origin: right;
@@ -214,7 +383,7 @@ onUnmounted(() => {
 
 #mainNav .navbar-nav .nav-item .nav-link:hover,
 #mainNav .navbar-nav .nav-item .nav-link.active {
-  color: #0077e6;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 #mainNav .navbar-nav .nav-item {
@@ -237,8 +406,8 @@ onUnmounted(() => {
 
 #mainNav.navbar-shrink {
   padding: 0.8rem 0;
-  background-color: rgba(33, 37, 41, 0.98);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  background-color: #000000;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
 #mainNav.navbar-shrink .navbar-brand img {
@@ -247,17 +416,75 @@ onUnmounted(() => {
 
 /* Footer */
 .footer {
-  text-align: center;
   font-size: 0.9rem;
-  background-color: #f8f9fa;
-  padding: 4rem 0;
+  background-color: #000000;
+  color: #fff;
+  padding: 4rem 0 2rem;
+  margin-top: auto;
+  width: 100%;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.footer-section {
+  text-align: left;
+}
+
+.footer-section h3 {
+  font-size: 1.5rem;
+  margin-bottom: 1.5rem;
+  color: #fff;
+  font-weight: 600;
+  text-align: left;
+}
+
+.footer-section ul {
+  padding-left: 0;
+}
+
+.footer-section ul li {
+  margin-bottom: 0.5rem;
+}
+
+.footer-section ul li a {
+  color: rgba(255, 255, 255, 0.8);
+  text-decoration: none;
+  transition: color 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.footer-section ul li a i {
+  width: 20px;
+}
+
+.footer-section ul li a:hover {
+  color: #fff;
+}
+
+.footer-section ul li i {
+  margin-right: 0.5rem;
+  color: #fff;
+}
+
+.footer-section p {
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.6;
+  text-align: left;
+}
+
+.footer-bottom {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.9rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 2rem;
 }
 
 .btn-social {
   height: 2.5rem;
   width: 2.5rem;
   display: inline-flex;
-  align-items: center;
+      align-items: center;
   justify-content: center;
   padding: 0;
   border-radius: 100%;
@@ -305,23 +532,47 @@ section {
   }
   
   #mainNav .navbar-brand .brand-text {
-    font-size: 1.2rem;
-  }
+        font-size: 1.2rem;
+      }
 
   #mainNav .navbar-collapse {
-    position: absolute;
+    position: fixed;
     top: 70px;
     left: 0;
     right: 0;
-    background-color: rgba(33, 37, 41, 0.98);
+    background: #000000;
+    backdrop-filter: blur(10px);
     padding: 1rem;
+    border-radius: 0 0 1rem 1rem;
+    margin-top: 0;
     max-height: calc(100vh - 70px);
     overflow-y: auto;
+    transition: all 0.3s ease-in-out;
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none;
   }
 
-  #mainNav .navbar-nav .nav-item .nav-link {
-    padding: 0.75rem 1rem;
-    text-align: center;
+  #mainNav .navbar-collapse.show {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  #mainNav .navbar-nav {
+    padding: 1rem 0;
+  }
+
+  #mainNav .nav-item {
+    margin: 0.5rem 0;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s ease-in-out;
+  }
+
+  #mainNav .navbar-collapse.show .nav-item {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -445,4 +696,74 @@ section {
 #mainNav.admin-nav .container {
   padding: 0 1.5rem;
 }
-</style>
+
+.navbar-toggler {
+  border: none !important;
+  padding: 0.5rem;
+  color: #fff !important;
+  transition: all 0.3s ease;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.navbar-toggler:hover {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.navbar-toggler:focus {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.navbar-toggler i {
+  font-size: 1.5rem;
+  transition: transform 0.3s ease;
+}
+
+.navbar-toggler:not(.collapsed) i {
+  transform: rotate(180deg);
+}
+
+@media (max-width: 991.98px) {
+  #mainNav .navbar-collapse {
+    position: fixed;
+    top: 70px;
+    left: 0;
+    right: 0;
+    background: #000000;
+    backdrop-filter: blur(10px);
+    padding: 1rem;
+    border-radius: 0 0 1rem 1rem;
+    margin-top: 0;
+    max-height: calc(100vh - 70px);
+    overflow-y: auto;
+    transition: all 0.3s ease-in-out;
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none;
+  }
+
+  #mainNav .navbar-collapse.show {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  #mainNav .navbar-nav {
+    padding: 1rem 0;
+  }
+
+  #mainNav .nav-item {
+    margin: 0.5rem 0;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s ease-in-out;
+  }
+
+  #mainNav .navbar-collapse.show .nav-item {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+</style> 
