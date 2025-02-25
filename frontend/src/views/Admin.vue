@@ -121,64 +121,32 @@
             </form>
           </div>
 
-          <!-- Ana Sayfa -->
-          <div v-if="currentTab === 'hero'" class="tab-content">
-            <h2>Ana Sayfa</h2>
-            <form @submit.prevent="updateHero" class="edit-form">
-              <input v-model="hero.subheading" type="text" placeholder="Alt Başlık">
-              <input v-model="hero.heading" type="text" placeholder="Başlık">
-              <input v-model="hero.buttonText" type="text" placeholder="Buton Metni">
-              <div class="image-upload">
-                <input type="file" @change="handleHeroImage" accept="image/*" :required="!hero.backgroundImage">
-                <img v-if="hero.backgroundImage" :src="hero.backgroundImage" class="preview-image">
-              </div>
-              <button type="submit">Güncelle</button>
-            </form>
-          </div>
-
-          <!-- Footer -->
-          <div v-if="currentTab === 'footer'" class="tab-content">
-            <h2>Footer</h2>
-            <form @submit.prevent="updateFooter" class="edit-form">
-              <input v-model="footer.copyright" type="text" placeholder="Telif Hakkı">
-              <input v-model="footer.socialLinks.twitter" type="text" placeholder="Twitter">
-              <input v-model="footer.socialLinks.facebook" type="text" placeholder="Facebook">
-              <input v-model="footer.socialLinks.instagram" type="text" placeholder="Instagram">
-              <input v-model="footer.links.privacy" type="text" placeholder="Gizlilik Politikası">
-              <input v-model="footer.links.terms" type="text" placeholder="Kullanım Şartları">
-              <button type="submit">Güncelle</button>
-            </form>
-          </div>
-
-          <!-- Users Section -->
+          <!-- Users Tab -->
           <div v-if="currentTab === 'users'" class="tab-content">
-            <h2>Kullanıcı Yönetimi</h2>
             <button @click="openAddUserModal" class="add-button">
-              Yeni Kullanıcı Ekle
+              <i class="fas fa-plus"></i> Yeni Kullanıcı Ekle
             </button>
             
             <div class="users-table">
               <table>
                 <thead>
                   <tr>
-                    <th>ID</th>
                     <th>Kullanıcı Adı</th>
-                    <th>Telefon</th>
+                    <th>E-posta</th>
                     <th>Rol</th>
                     <th>İşlemler</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-for="user in users" :key="user.id">
-                    <td>{{ user.id }}</td>
                     <td>{{ user.username }}</td>
-                    <td>{{ user.phone }}</td>
+                    <td>{{ user.email }}</td>
                     <td>{{ getRoleName(user.role_id) }}</td>
                     <td class="actions">
-                      <button @click="editUser(user)" class="edit-btn">
+                      <button @click="editUser(user)" class="btn-edit">
                         <i class="fas fa-edit"></i>
                       </button>
-                      <button @click="deleteUser(user.id)" class="delete-btn">
+                      <button @click="deleteUser(user.id)" class="btn-delete">
                         <i class="fas fa-trash"></i>
                       </button>
                     </td>
@@ -218,58 +186,68 @@
       </form>
     </Dialog>
 
-    <!-- User Add/Edit Modal -->
-    <Dialog v-model:visible="showAddUserModal" :header="editingUser ? 'Kullanıcı Düzenle' : 'Yeni Kullanıcı Ekle'" class="user-modal">
-      <form @submit.prevent="saveUser" class="modal-form">
+    <!-- Add User Modal -->
+    <Dialog v-model:visible="showAddUserModal" header="Kullanıcı Ekle" :style="{ width: '400px' }">
+      <div class="user-form">
         <div class="form-group">
           <label>Kullanıcı Adı</label>
-          <input v-model="userForm.username" type="text" placeholder="Kullanıcı Adı" required>
+          <input type="text" v-model="userForm.username" class="form-control" required>
         </div>
-
         <div class="form-group">
-          <label>Telefon Numarası</label>
-          <input v-model="userForm.phone" type="tel" placeholder="5XX XXX XX XX" 
-                 required pattern="[0-9]{10}" 
-                 @input="formatPhoneNumber">
+          <label>E-posta</label>
+          <input type="email" v-model="userForm.email" class="form-control" required>
         </div>
-
         <div class="form-group">
-          <label>Kullanıcı Rolü</label>
-          <select v-model="userForm.role_id" required class="role-select">
-            <option value="">Rol Seçin</option>
+          <label>Şifre</label>
+          <input type="password" v-model="userForm.password" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label>Rol</label>
+          <select v-model="userForm.role_id" class="form-control">
             <option value="1">Admin</option>
             <option value="2">Editör</option>
           </select>
         </div>
-
-        <template v-if="!editingUser">
-          <div class="form-group">
-            <label>Şifre (en az 6 karakter)</label>
-            <input v-model="userForm.password" type="password" placeholder="Şifre" required minlength="6">
-          </div>
-
-          <div class="form-group">
-            <label>Şifre (Tekrar)</label>
-            <input v-model="userForm.confirmPassword" type="password" placeholder="Şifreyi tekrar girin" required minlength="6">
-          </div>
-
-          <div class="password-requirements">
-            <p>Şifre gereksinimleri:</p>
-            <ul>
-              <li>En az 6 karakter uzunluğunda olmalı</li>
-              <li>Şifre ve şifre tekrarı aynı olmalı</li>
-            </ul>
-          </div>
-        </template>
-
-        <div v-if="formError" class="error-message">{{ formError }}</div>
-
         <div class="modal-actions">
-          <button type="button" @click="showAddUserModal = false" class="btn btn-secondary">İptal</button>
-          <button type="submit" class="btn btn-primary">{{ editingUser ? 'Güncelle' : 'Ekle' }}</button>
+          <button type="button" @click="closeAddUserModal" class="btn btn-secondary">İptal</button>
+          <button type="button" @click="saveUser" class="btn btn-primary">
+            <i class="fas fa-save"></i> Kaydet
+          </button>
         </div>
-      </form>
+      </div>
     </Dialog>
+
+    <!-- Edit User Modal -->
+    <Dialog v-model:visible="showEditUserModal" header="Kullanıcı Düzenle" :style="{ width: '400px' }">
+      <div class="user-form">
+        <div class="form-group">
+          <label>Kullanıcı Adı</label>
+          <input type="text" v-model="userForm.username" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label>E-posta</label>
+          <input type="email" v-model="userForm.email" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label>Rol</label>
+          <select v-model="userForm.role_id" class="form-control">
+            <option value="1">Admin</option>
+            <option value="2">Editör</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="button" @click="closeEditUserModal" class="btn btn-secondary">İptal</button>
+          <button type="button" @click="updateUser" class="btn btn-primary">
+            <i class="fas fa-save"></i> Güncelle
+          </button>
+        </div>
+      </div>
+    </Dialog>
+
+    <!-- Copyright Footer -->
+    <div class="copyright-footer">
+      <p>&copy; {{ new Date().getFullYear() }} Kozan İklimlendirme. Tüm hakları saklıdır.</p>
+    </div>
   </div>
 </template>
 
@@ -302,24 +280,6 @@ const products = ref([])
 const services = ref([])
 const about = ref({})
 const contact = ref({})
-const hero = ref({
-  subheading: 'Klima Kozan\'a Hoş Geldiniz',
-  heading: 'Profesyonel Klima ve Beyaz Eşya Çözümleri',
-  buttonText: 'Hizmetlerimizi Keşfedin',
-  backgroundImage: ''
-})
-const footer = ref({
-  copyright: 'Copyright © Klima Kozan 2024',
-  socialLinks: {
-    twitter: '#',
-    facebook: '#',
-    instagram: '#'
-  },
-  links: {
-    privacy: 'Gizlilik Politikası',
-    terms: 'Kullanım Şartları'
-  }
-})
 const users = ref([])
 
 const showAddProductModal = ref(false)
@@ -327,6 +287,7 @@ const showAddServiceModal = ref(false)
 const editingProduct = ref(null)
 const editingService = ref(null)
 const showAddUserModal = ref(false)
+const showEditUserModal = ref(false)
 const editingUser = ref(null)
 
 const productForm = ref({
@@ -344,10 +305,9 @@ const serviceForm = ref({
 
 const userForm = ref({
   username: '',
-  phone: '',
-  role_id: '',
+  email: '',
   password: '',
-  confirmPassword: ''
+  role_id: 2
 })
 
 const formError = ref('')
@@ -367,13 +327,11 @@ const login = async () => {
 // Veri yükleme işlemleri
 const fetchData = async () => {
   try {
-    const [productsRes, servicesRes, aboutRes, contactRes, heroRes, footerRes, usersRes] = await Promise.all([
+    const [productsRes, servicesRes, aboutRes, contactRes, usersRes] = await Promise.all([
       axios.get('/api/admin/products'),
       axios.get('/api/admin/services'),
       axios.get('/api/admin/about'),
       axios.get('/api/admin/contact'),
-      axios.get('/api/admin/hero'),
-      axios.get('/api/admin/footer'),
       axios.get('/api/admin/users')
     ])
 
@@ -381,8 +339,6 @@ const fetchData = async () => {
     services.value = servicesRes.data
     about.value = aboutRes.data
     contact.value = contactRes.data
-    hero.value = heroRes.data
-    footer.value = footerRes.data
     users.value = usersRes.data
   } catch (error) {
     console.error('Veri yüklenirken hata oluştu:', error)
@@ -477,26 +433,6 @@ const updateContact = async () => {
   }
 }
 
-// Hero güncelleme
-const updateHero = async () => {
-  try {
-    await axios.put('/api/admin/hero', hero.value)
-    alert('Ana sayfa içeriği güncellendi!')
-  } catch (error) {
-    alert('Güncelleme başarısız!')
-  }
-}
-
-// Footer güncelleme
-const updateFooter = async () => {
-  try {
-    await axios.put('/api/admin/footer', footer.value)
-    alert('Footer içeriği güncellendi!')
-  } catch (error) {
-    alert('Güncelleme başarısız!')
-  }
-}
-
 // Resim yükleme işlemleri
 const handleAboutImage = (event) => {
   const file = event.target.files[0]
@@ -532,24 +468,6 @@ const handleServiceImage = (event) => {
   }
 }
 
-// Hero resmi yükleme
-const handleHeroImage = (event) => {
-  const file = event.target.files[0]
-  if (file) {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      hero.value.backgroundImage = e.target.result
-    }
-    reader.readAsDataURL(file)
-  }
-}
-
-// Add Google Maps URL generator
-const getGoogleMapsUrl = () => {
-  if (!contact.value?.latitude || !contact.value?.longitude) return '#'
-  return `https://www.google.com/maps?q=${contact.value.latitude},${contact.value.longitude}`
-}
-
 // Tab ikonlarını belirle
 const getTabIcon = (tabId) => {
   const icons = {
@@ -557,8 +475,6 @@ const getTabIcon = (tabId) => {
     services: 'fas fa-tools',
     about: 'fas fa-info-circle',
     contact: 'fas fa-address-card',
-    hero: 'fas fa-home',
-    footer: 'fas fa-shoe-prints',
     users: 'fas fa-users'
   }
   return icons[tabId]
@@ -583,58 +499,44 @@ const formatPhoneNumber = (event) => {
   userForm.value.phone = phone
 }
 
+const resetUserForm = () => {
+  userForm.value = {
+    username: '',
+    email: '',
+    password: '',
+    role_id: 2
+  }
+}
+
 const saveUser = async () => {
   try {
-    formError.value = ''
-
-    // Validate phone number
-    if (userForm.value.phone.length !== 10) {
-      formError.value = 'Geçerli bir telefon numarası giriniz (5XX XXX XX XX)'
-      return
-    }
-
-    // Validate password match for new users
-    if (!editingUser.value && userForm.value.password !== userForm.value.confirmPassword) {
-      formError.value = 'Şifreler eşleşmiyor'
-      return
-    }
-
     const userData = {
       username: userForm.value.username,
-      phone: userForm.value.phone,
-      role_id: parseInt(userForm.value.role_id),
-      password: userForm.value.password
+      email: userForm.value.email,
+      password: userForm.value.password,
+      role_id: parseInt(userForm.value.role_id)
     }
-
-    console.log('Gönderilen kullanıcı verisi:', userData)
-
-    if (editingUser.value) {
-      await axios.put(`/api/admin/users/${editingUser.value.id}`, userData)
-    } else {
-      await axios.post('/api/admin/users', userData)
-    }
-
+    await axios.post('/api/admin/users', userData)
     await fetchData()
-    showAddUserModal.value = false
-    userForm.value = { username: '', phone: '', role_id: '', password: '', confirmPassword: '' }
-    editingUser.value = null
-    formError.value = ''
+    closeAddUserModal()
+    alert('Kullanıcı başarıyla eklendi')
   } catch (error) {
-    console.error('Hata detayı:', error.response?.data)
-    formError.value = error.response?.data?.error || 'İşlem başarısız oldu. Lütfen tekrar deneyin.'
+    if (error.response?.data?.error) {
+      alert(error.response.data.error)
+    } else {
+      alert('Kullanıcı eklenirken bir hata oluştu')
+    }
   }
 }
 
 const editUser = (user) => {
-  editingUser.value = user
   userForm.value = {
+    id: user.id,
     username: user.username,
-    phone: user.phone || '',
-    role_id: user.role_id,
-    password: '',
-    confirmPassword: ''
+    email: user.email,
+    role_id: user.role_id
   }
-  showAddUserModal.value = true
+  showEditUserModal.value = true
 }
 
 const deleteUser = async (id) => {
@@ -663,15 +565,36 @@ const getRoleName = (roleId) => {
 // Add after the getRoleName function:
 const openAddUserModal = () => {
   editingUser.value = null
-  userForm.value = {
-    username: '',
-    phone: '',
-    role_id: '',
-    password: '',
-    confirmPassword: ''
-  }
-  formError.value = ''
+  resetUserForm()
   showAddUserModal.value = true
+}
+
+const closeAddUserModal = () => {
+  showAddUserModal.value = false
+}
+
+const closeEditUserModal = () => {
+  showEditUserModal.value = false
+}
+
+const updateUser = async () => {
+  try {
+    const userData = {
+      username: userForm.value.username,
+      email: userForm.value.email,
+      role_id: parseInt(userForm.value.role_id)
+    }
+    await axios.put(`/api/admin/users/${userForm.value.id}`, userData)
+    await fetchData()
+    closeEditUserModal()
+    alert('Kullanıcı başarıyla güncellendi')
+  } catch (error) {
+    if (error.response?.data?.error) {
+      alert(error.response.data.error)
+    } else {
+      alert('Kullanıcı güncellenirken bir hata oluştu')
+    }
+  }
 }
 
 // Sayfa yüklendiğinde verileri getir
@@ -685,6 +608,8 @@ if (isAuthenticated.value) {
   min-height: 100vh;
   background-color: #f8f9fa;
   padding-top: 76px;
+  display: flex;
+  flex-direction: column;
 }
 
 .admin-header, .admin-actions {
@@ -998,15 +923,12 @@ if (isAuthenticated.value) {
 .users-table {
   width: 100%;
   overflow-x: auto;
-  margin-top: 2rem;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .users-table table {
   width: 100%;
   border-collapse: collapse;
+  margin-top: 1rem;
 }
 
 .users-table th,
@@ -1017,41 +939,78 @@ if (isAuthenticated.value) {
 }
 
 .users-table th {
-  background: #f8f9fa;
+  background-color: #f8f9fa;
   font-weight: 600;
-  color: #333;
 }
 
-.users-table .actions {
+.users-table tr:hover {
+  background-color: #f8f9fa;
+}
+
+.actions {
   display: flex;
   gap: 0.5rem;
 }
 
-.users-table .edit-btn,
-.users-table .delete-btn {
+.btn-edit,
+.btn-delete {
   padding: 0.5rem;
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: background-color 0.3s;
 }
 
-.users-table .edit-btn {
-  background: #007bff;
+.btn-edit {
+  background-color: #007bff;
   color: white;
 }
 
-.users-table .delete-btn {
-  background: #dc3545;
+.btn-delete {
+  background-color: #dc3545;
   color: white;
 }
 
-.users-table .edit-btn:hover {
-  background: #0056b3;
+.btn-edit:hover {
+  background-color: #0056b3;
 }
 
-.users-table .delete-btn:hover {
-  background: #c82333;
+.btn-delete:hover {
+  background-color: #c82333;
+}
+
+.user-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem 0;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-weight: 500;
+  color: #333;
+}
+
+.form-control {
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #007bff;
+}
+
+select.form-control {
+  cursor: pointer;
 }
 
 .error-message {
@@ -1176,5 +1135,71 @@ if (isAuthenticated.value) {
 
 .password-requirements li {
   margin: 0.25rem 0;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn i {
+  font-size: 1rem;
+}
+
+.btn-primary {
+  background-color: #007bff;
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: #0056b3;
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background-color: #5a6268;
+}
+
+/* Copyright Footer */
+.copyright-footer {
+  text-align: center;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-top: 1px solid #eee;
+  color: #666;
+  font-size: 0.9rem;
+  margin-top: auto;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .admin {
+    padding-top: 60px;
+  }
+  
+  .copyright-footer {
+    padding: 0.75rem;
+    font-size: 0.85rem;
+  }
 }
 </style> 

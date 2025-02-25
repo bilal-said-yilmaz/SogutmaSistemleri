@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, nextTick, defineAsyncComponent } from 'vue'
 import axios from 'axios'
-import Dialog from 'primevue/dialog'
+import { useStore } from 'vuex'
 
+// TypeScript interfaces
 interface Product {
   id: number
-  title: string
+  name: string
   description: string
   image: string
   category: string
@@ -25,29 +26,57 @@ interface Contact {
   sundayHours: string
 }
 
+interface ProductForm {
+  image: string
+}
+
+interface ServiceForm {
+  image: string
+}
+
 // Services Data
+const store = useStore()
 const services = ref<Product[]>([])
 const products = ref<Product[]>([])
-const about = ref<{ title: string; content: string; image: string } | null>(null)
-const contact = ref<Contact | null>(null)
-
-// Contact Form
-const contactForm = ref({
-  name: '',
-  email: '',
-  phone: '',
-  message: ''
+const selectedProduct = ref<Product | null>(null)
+const about = ref({
+  title: 'Kozan İklimlendirme',
+  content: '',
+  image: '/placeholder-about.jpg'
 })
-const isSubmitting = ref(false)
+const contact = ref<Contact | null>(null)
 
 // Product modal state
 const showProductModal = ref(false)
-const selectedProduct = ref(null)
 
 // Add video state management
 const videoError = ref(false)
 const handleVideoError = () => {
   videoError.value = true
+}
+
+// Lazy loaded components
+const Dialog = defineAsyncComponent(() => import('primevue/dialog'))
+
+// Intersection Observer için ref
+const observerRef = ref(null)
+
+// Form refs
+const productForm = ref<ProductForm>({ image: '' })
+const serviceForm = ref<ServiceForm>({ image: '' })
+
+// Görsel önbelleğe alma
+const preloadImages = () => {
+  const imageUrls = [
+    ...products.value.map(p => p.image),
+    ...services.value.map(s => s.image),
+    about.value?.image
+  ].filter((url): url is string => url !== undefined)
+
+  imageUrls.forEach(url => {
+    const img = new Image()
+    img.src = url
+  })
 }
 
 // Fetch data
@@ -60,35 +89,26 @@ const fetchData = async () => {
       axios.get<Contact>('/api/contact')
     ])
 
-    services.value = servicesRes.data
-    products.value = productsRes.data
-    about.value = aboutRes.data
+    services.value = servicesRes.data.map(service => ({
+      ...service,
+      image: service.image || '/placeholder-image.jpg'
+    }))
+    
+    products.value = productsRes.data.map(product => ({
+      ...product,
+      image: product.image || '/placeholder-image.jpg'
+    }))
+    
+    about.value = {
+      ...aboutRes.data,
+      image: aboutRes.data.image || '/placeholder-about.jpg'
+    }
+    
     contact.value = contactRes.data
     
-    // Debug contact data
-    console.log('Contact Data:', contactRes.data)
+    // Debug logları kaldırıldı
   } catch (error) {
     console.error('Veri yüklenirken hata oluştu:', error)
-  }
-}
-
-// Handle Contact Form Submit
-const handleContactSubmit = async () => {
-  isSubmitting.value = true
-  try {
-    await axios.post('/api/contact', contactForm.value)
-    alert('Mesajınız başarıyla gönderildi!')
-    contactForm.value = {
-      name: '',
-      email: '',
-      phone: '',
-      message: ''
-    }
-  } catch (error) {
-    console.error('Error submitting contact form:', error)
-    alert('Mesaj gönderilirken bir hata oluştu. Lütfen tekrar deneyin.')
-  } finally {
-    isSubmitting.value = false
   }
 }
 
@@ -104,11 +124,71 @@ const formatPrice = (price) => {
 
 const openProductModal = (product) => {
   selectedProduct.value = product
-  showProductModal.value = true
+}
+
+const closeProductModal = (event) => {
+  if (event.target.classList.contains('modal-overlay')) {
+    selectedProduct.value = null
+  }
 }
 
 onMounted(() => {
   fetchData()
+  
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const img = entry.target as HTMLImageElement
+          const dataSrc = img.getAttribute('data-src')
+          if (dataSrc) {
+            img.src = dataSrc
+            img.removeAttribute('data-src')
+          }
+          observer.unobserve(img)
+        }
+      })
+    },
+    {
+      rootMargin: '50px 0px',
+      threshold: 0.1
+    }
+  )
+
+  const images = document.querySelectorAll('img[data-src]')
+  images.forEach(img => observer.observe(img))
+
+  // Veri yüklendikten sonra görselleri önbelleğe al
+  watch([products, services, about], () => {
+    nextTick(() => {
+      preloadImages()
+    })
+  })
+})
+
+// Performance metrics için düzeltme
+const reportPerformance = () => {
+  if ('performance' in window) {
+    const metrics = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming
+    if (metrics) {
+      // Performance metrikleri kaldırıldı
+      const perfData = {
+        dnsTime: metrics.domainLookupEnd - metrics.domainLookupStart,
+        tcpTime: metrics.connectEnd - metrics.connectStart,
+        firstByteTime: metrics.responseStart - metrics.requestStart,
+        domLoadTime: metrics.domComplete - metrics.domInteractive,
+        totalTime: metrics.loadEventEnd - metrics.startTime
+      }
+      // Metrikleri bir analytics servisine gönderebiliriz
+    }
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('load', reportPerformance)
+  return () => {
+    window.removeEventListener('load', reportPerformance)
+  }
 })
 
 // Add function to generate Google Maps URL
@@ -126,7 +206,111 @@ const makePhoneCall = () => {
 }
 
 const sendEmail = () => {
-  window.location.href = `mailto:${contact.value?.email}`
+  const email = contact.value?.email || 'kozaniklimlendirme@gmail.com'
+  window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${email}`, '_blank')
+}
+
+// Add default phone number
+const defaultPhone = '+90 (538) 515 3191'
+
+// Add handlePhoneClick function
+const handlePhoneClick = () => {
+  const phoneNumber = contact.value?.phone || defaultPhone
+  // Remove spaces and parentheses for the tel: link
+  const formattedPhone = phoneNumber.replace(/[\s()]/g, '')
+  window.location.href = `tel:${formattedPhone}`
+}
+
+// Görsel dönüştürme fonksiyonu düzeltmesi
+const convertToWebP = async (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (e: ProgressEvent<FileReader>) => {
+      if (!e.target?.result) {
+        reject(new Error('Failed to read file'))
+        return
+      }
+      
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.width
+        canvas.height = img.height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          reject(new Error('Failed to get canvas context'))
+          return
+        }
+        
+        ctx.drawImage(img, 0, 0)
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            reject(new Error('Failed to create blob'))
+            return
+          }
+          resolve(URL.createObjectURL(blob))
+        }, 'image/webp', 0.8)
+      }
+      img.src = e.target.result as string
+    }
+    reader.onerror = () => reject(new Error('Failed to read file'))
+    reader.readAsDataURL(file)
+  })
+}
+
+// Form ve görsel işleme fonksiyonları düzeltmesi
+const handleProductImage = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (file) {
+    try {
+      const webpUrl = await convertToWebP(file)
+      productForm.value.image = webpUrl
+    } catch (error) {
+      console.error('Görsel dönüştürme hatası:', error)
+      const reader = new FileReader()
+      reader.onload = (e: ProgressEvent<FileReader>) => {
+        if (e.target?.result) {
+          productForm.value.image = e.target.result as string
+        }
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+}
+
+const handleServiceImage = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (file) {
+    try {
+      const webpUrl = await convertToWebP(file)
+      serviceForm.value.image = webpUrl
+    } catch (error) {
+      console.error('Görsel dönüştürme hatası:', error)
+      const reader = new FileReader()
+      reader.onload = (e: ProgressEvent<FileReader>) => {
+        if (e.target?.result) {
+          serviceForm.value.image = e.target.result as string
+        }
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+}
+
+const handleAboutImage = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (file) {
+    const reader = new FileReader()
+    reader.onload = (e: ProgressEvent<FileReader>) => {
+      if (e.target?.result) {
+        about.value.image = e.target.result as string
+      }
+    }
+    reader.readAsDataURL(file)
+  }
 }
 </script>
 
@@ -169,9 +353,17 @@ const sendEmail = () => {
         <div class="row text-center">
           <div class="col-md-4 service-item fade-in" v-for="service in services" :key="service.id">
             <div class="service-image">
-              <img :src="service.image" :alt="service.title + ' - Kozan İklimlendirme'" loading="lazy" />
+              <img 
+                :src="service.image" 
+                :alt="service.name + ' - Kozan İklimlendirme'" 
+                loading="lazy"
+                decoding="async"
+                fetchpriority="low"
+                width="300"
+                height="200"
+              />
             </div>
-            <h3 class="service-heading">{{ service.title }}</h3>
+            <h3 class="service-heading">{{ service.name }}</h3>
             <p class="service-description">{{ service.description }}</p>
             <ul class="service-features" v-if="service.features">
               <li v-for="feature in service.features" :key="feature">{{ feature }}</li>
@@ -192,7 +384,16 @@ const sendEmail = () => {
           <div class="col-lg-4 col-sm-6 mb-4" v-for="product in products" :key="product.id">
             <article class="product-card" @click="openProductModal(product)">
               <div class="product-image">
-                <img class="img-fluid" :src="product.image" :alt="product.name + ' - Kozan İklimlendirme'" loading="lazy" />
+                <img 
+                  class="img-fluid" 
+                  :src="product.image" 
+                  :alt="product.name + ' - Kozan İklimlendirme'" 
+                  loading="lazy"
+                  decoding="async"
+                  fetchpriority="low"
+                  width="300"
+                  height="200"
+                />
                 <div class="product-overlay">
                   <div class="overlay-content">
                     <i class="fas fa-search-plus"></i>
@@ -213,48 +414,49 @@ const sendEmail = () => {
         </div>
       </div>
 
-      <!-- Product Detail Modal -->
-      <Dialog 
-        v-model:visible="showProductModal" 
-        :modal="true" 
-        :dismissableMask="true"
-        :style="{ width: '90%', maxWidth: '800px' }"
-        class="product-modal"
-      >
-        <template #header>
-          <h3 class="modal-title">{{ selectedProduct?.name }}</h3>
-        </template>
-        <template #default>
-          <div class="product-modal-content" v-if="selectedProduct">
-            <div class="row">
-              <div class="col-md-6">
-                <img :src="selectedProduct.image" :alt="selectedProduct.name" class="modal-product-image">
+      <!-- Ürün Detay Modalı -->
+      <div v-if="selectedProduct" class="modal-overlay" @click="closeProductModal">
+        <div class="modal-content" @click.stop>
+          <button class="modal-close" @click="selectedProduct = null">
+            <i class="fas fa-times"></i>
+          </button>
+          <div class="modal-body">
+            <div class="product-modal-grid">
+              <div class="product-image-container">
+                <img 
+                  :src="selectedProduct.image" 
+                  :alt="selectedProduct.name" 
+                  class="modal-product-image"
+                  loading="lazy"
+                  decoding="async"
+                  width="400"
+                  height="300"
+                >
               </div>
-              <div class="col-md-6">
-                <div class="product-info">
-                  <h4 class="price">{{ formatPrice(selectedProduct.price) }} TL</h4>
-                  <p class="description">{{ selectedProduct.description }}</p>
-                  <div class="contact-info">
-                    <h5>Sipariş ve Bilgi için:</h5>
-                    <div v-if="contact">
-                      <p>
-                        <a :href="'tel:' + contact.phone" class="contact-link">
-                          <i class="pi pi-phone"></i> {{ contact.phone }}
-                        </a>
-                      </p>
-                      <p>
-                        <a :href="'mailto:' + contact.email" class="contact-link">
-                          <i class="pi pi-envelope"></i> {{ contact.email }}
-                        </a>
-                      </p>
-                    </div>
+              <div class="product-info-container">
+                <h3 class="modal-title">{{ selectedProduct.name }}</h3>
+                <div class="price-tag">
+                  <span class="price">{{ formatPrice(selectedProduct.price) }}</span>
+                  <span class="currency">TL</span>
+                </div>
+                <div class="product-description">
+                  <p>{{ selectedProduct.description }}</p>
+                </div>
+                <div class="product-contact">
+                  <p class="contact-info">
+                    <i class="fas fa-info-circle"></i>
+                    Ürün hakkında bilgi almak için:
+                  </p>
+                  <div class="contact-details">
+                    <p><i class="fas fa-phone"></i>{{ contact?.phone || '+90 (538) 515 3191' }}</p>
+                    <p><i class="fas fa-envelope"></i>{{ contact?.email || 'kozaniklimlendirme@gmail.com' }}</p>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </template>
-      </Dialog>
+        </div>
+      </div>
     </section>
 
     <!-- About Section -->
@@ -266,7 +468,16 @@ const sendEmail = () => {
         </div>
         <div class="about-content">
           <div class="about-image">
-            <img :src="about?.image" :alt="about?.title" class="img-fluid">
+            <img 
+              :src="about?.image || '/placeholder-about.jpg'"
+              :alt="about?.title || 'Hakkımızda'"
+              class="img-fluid"
+              loading="lazy"
+              decoding="async"
+              fetchpriority="low"
+              width="600"
+              height="400"
+            />
           </div>
           <div class="about-text">
             <h3>{{ about?.title }}</h3>
@@ -292,31 +503,28 @@ const sendEmail = () => {
                 <div>
                   <strong>Adres</strong>
                   <p>
-                    <a :href="getGoogleMapsUrl()" target="_blank" class="address-link">
-                      {{ contact?.address }}
-                      <i class="pi pi-external-link"></i>
-                    </a>
+                    {{ contact?.address }}
+                    <span class="hover-text">
+                      <i class="fas fa-location-arrow"></i>
+                      Google Haritalarda göster
+                    </span>
                   </p>
                 </div>
               </div>
               
-              <div class="info-item clickable" @click="makePhoneCall">
+              <div class="info-item clickable" @click="handlePhoneClick">
                 <i class="pi pi-phone"></i>
                 <div>
-                  <strong>Telefon</strong>
-                  <p>
-                    <a :href="'tel:' + contact?.phone" class="contact-link">{{ contact?.phone }}</a>
-                  </p>
+                  <strong>Telefon:</strong>
+                  <p>{{ contact?.phone || defaultPhone }}</p>
                 </div>
               </div>
               
               <div class="info-item clickable" @click="sendEmail">
                 <i class="pi pi-envelope"></i>
                 <div>
-                  <strong>E-posta</strong>
-                  <p>
-                    <a :href="'mailto:' + contact?.email" class="contact-link">{{ contact?.email }}</a>
-                  </p>
+                  <strong>E-posta:</strong>
+                  <p>{{ contact?.email || 'kozaniklimlendirme@gmail.com' }} <i class="fas fa-external-link-alt"></i></p>
                 </div>
               </div>
               
@@ -345,41 +553,6 @@ const sendEmail = () => {
         </div>
       </div>
     </section>
-
-    <!-- Footer Section -->
-    <footer class="footer">
-      <div class="container">
-        <div class="footer-content">
-          <div class="footer-sections">
-            <div class="footer-section">
-              <h3>Hakkımızda</h3>
-              <p>Kozan İklimlendirme olarak, 15 yılı aşkın tecrübemizle Kozan'da klima ve beyaz eşya servisi hizmeti vermekteyiz.</p>
-            </div>
-            <div class="footer-section">
-              <h3>Hızlı Erişim</h3>
-              <ul>
-                <li><a href="#services">Hizmetlerimiz</a></li>
-                <li><a href="#products">Ürünler</a></li>
-                <li><a href="#about">Hakkımızda</a></li>
-                <li><a href="#contact">İletişim</a></li>
-              </ul>
-            </div>
-            <div class="footer-section">
-              <h3>İletişim</h3>
-              <ul>
-                <li><i class="pi pi-phone"></i> {{ contact?.phone }}</li>
-                <li><i class="pi pi-envelope"></i> {{ contact?.email }}</li>
-                <li><i class="pi pi-map-marker"></i> {{ contact?.address }}</li>
-              </ul>
-            </div>
-          </div>
-
-          <div class="footer-center">
-            <p>&copy; {{ new Date().getFullYear() }} Kozan İklimlendirme . Tüm hakları saklıdır .</p>
-          </div>
-        </div>
-      </div>
-    </footer>
   </div>
 </template>
 
@@ -536,6 +709,7 @@ const sendEmail = () => {
   overflow: hidden;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   aspect-ratio: 4/3;
+  background-color: #f8f9fa;
 }
 
 .service-image img {
@@ -543,6 +717,7 @@ const sendEmail = () => {
   height: 100%;
   object-fit: cover;
   transition: transform 0.3s ease;
+  display: block;
 }
 
 .service-item:hover .service-image img {
@@ -615,15 +790,29 @@ const sendEmail = () => {
   font-weight: 600;
 }
 
-.contact-link {
-  color: #1e90ff;
-  text-decoration: none;
-  transition: all 0.3s ease;
-  font-weight: 500;
+.info-item.clickable {
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.contact-link:hover {
-  color: #0077e6;
+.info-item.clickable:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(30, 144, 255, 0.15);
+  border-color: rgba(30, 144, 255, 0.2);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(248, 249, 250, 1));
+}
+
+.info-item p i {
+  margin-left: 0.5rem;
+  font-size: 0.9rem;
+  color: #1e90ff;
+  opacity: 0.8;
+  transition: all 0.3s ease;
+}
+
+.info-item:hover p i {
+  opacity: 1;
+  transform: translateX(2px);
 }
 
 .working-hours {
@@ -736,13 +925,24 @@ const sendEmail = () => {
 
 .product-details {
   padding: 1.5rem;
+  background: white;
 }
 
 .product-title {
   font-size: 1.25rem;
   margin-bottom: 0.75rem;
-  color: var(--primary-color);
-  text-align: left;
+  color: #1e3a8a;
+  font-weight: 700;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 3rem;
+  line-height: 1.4;
+  word-break: break-word;
+  max-width: 100%;
+  background: white;
+  padding: 0.5rem;
+  border-radius: 4px;
 }
 
 .product-description {
@@ -759,75 +959,214 @@ const sendEmail = () => {
   color: var(--primary-color);
 }
 
-/* Modal Styles */
-.product-modal {
-  .modal-title {
-    margin: 0;
-    color: var(--primary-color);
-  }
+/* Modern Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(5px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 0;
+}
+
+.modal-content {
+  background-color: #fff;
+  border-radius: 12px;
+  max-width: 800px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  margin: 1rem;
+}
+
+.modal-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: white;
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.modal-close:hover {
+  transform: scale(1.1);
+}
+
+.modal-close i {
+  font-size: 1rem;
+  color: #333;
+}
+
+.modal-body {
+  padding: 0;
+}
+
+.product-modal-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-height: auto;
+}
+
+.product-image-container {
+  position: relative;
+  background: #f8f9fa;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px 12px 0 0;
+  min-height: 180px;
 }
 
 .modal-product-image {
-  width: 100%;
+  max-width: 100%;
+  height: auto;
+  max-height: 200px;
+  object-fit: contain;
   border-radius: 8px;
+}
+
+.product-info-container {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.modal-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1e3a8a;
+  margin-bottom: 0.75rem;
+  line-height: 1.3;
+}
+
+.price-tag {
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.price {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1e90ff;
+}
+
+.currency {
+  font-size: 1rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.product-description {
+  color: #4a5568;
+  font-size: 0.9rem;
+  line-height: 1.6;
   margin-bottom: 1rem;
 }
 
-.product-info {
-  .price {
-    font-size: 2rem;
-    color: var(--primary-color);
-    margin-bottom: 1rem;
-  }
-
-  .description {
-    font-size: 1rem;
-    line-height: 1.6;
-    margin-bottom: 2rem;
-  }
-
-  .contact-info {
-    background: #f8f9fa;
-    padding: 1rem;
-    border-radius: 8px;
-
-    h5 {
-      color: var(--primary-color);
-      margin-bottom: 1rem;
-    }
-
-    p {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-bottom: 0.5rem;
-
-      i {
-        color: var(--primary-color);
-      }
-    }
-  }
+.product-contact {
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
 }
 
-/* Remove map styles and add address link styles */
-.address-link {
-  color: var(--primary-color);
-  text-decoration: none;
-  display: inline-flex;
+.contact-info {
+  font-size: 0.9rem;
+  color: #2d3748;
+  margin-bottom: 0.75rem;
+  display: flex;
   align-items: center;
   gap: 0.5rem;
-  transition: color 0.3s ease;
 }
 
-.address-link:hover {
-  color: var(--primary-color-dark);
+.contact-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
-.address-link i {
+.contact-details p {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #4a5568;
   font-size: 0.9rem;
 }
 
-/* Remove contact-map class */
+@media (min-width: 768px) {
+  .product-modal-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .product-image-container {
+    border-radius: 12px 0 0 12px;
+    min-height: 300px;
+    padding: 1.5rem;
+  }
+
+  .modal-product-image {
+    max-height: 250px;
+  }
+
+  .product-info-container {
+    padding: 2rem;
+  }
+
+  .modal-title {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .modal-content {
+    margin: 0.5rem;
+    max-height: 90vh;
+  }
+
+  .product-image-container {
+    min-height: 150px;
+  }
+
+  .modal-product-image {
+    max-height: 180px;
+  }
+
+  .product-info-container {
+    padding: 1rem;
+  }
+
+  .modal-title {
+    font-size: 1.1rem;
+  }
+
+  .price {
+    font-size: 1.25rem;
+  }
+
+  .product-description {
+    font-size: 0.85rem;
+  }
+}
 
 /* About Section */
 .about-content {
@@ -843,30 +1182,25 @@ const sendEmail = () => {
   overflow: hidden;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   position: relative;
-}
-
-.about-image::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, rgba(30, 144, 255, 0.1), rgba(255, 107, 43, 0.1));
-  z-index: 1;
-  pointer-events: none;
+  background-color: #f8f9fa;
+  min-height: 400px;
 }
 
 .about-image img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  aspect-ratio: 4/3;
+  position: absolute;
+  top: 0;
+  left: 0;
   transition: transform 0.6s ease;
+  display: block;
 }
 
-.about-image:hover img {
-  transform: scale(1.05);
+.about-image::before {
+  content: '';
+  display: block;
+  padding-top: 66.67%; /* 3:2 aspect ratio */
 }
 
 .about-text {
@@ -897,22 +1231,15 @@ const sendEmail = () => {
   margin-bottom: 0;
 }
 
-.about-text .content p:last-child {
-  margin-bottom: 0;
-}
-
 @media (max-width: 991px) {
   .about-content {
     flex-direction: column;
     gap: 2rem;
   }
 
-  .about-image, .about-text {
+  .about-image {
     width: 100%;
-  }
-
-  .about-text {
-    padding: 1.5rem;
+    min-height: 300px;
   }
 }
 
@@ -932,19 +1259,6 @@ const sendEmail = () => {
 
 #products .section-subheading {
   text-align: center !important;
-}
-
-/* Add these styles to the style section */
-.info-item.clickable {
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.info-item.clickable:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(30, 144, 255, 0.15);
-  border-color: rgba(30, 144, 255, 0.2);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(248, 249, 250, 1));
 }
 
 /* Footer Styles */
@@ -1052,5 +1366,145 @@ const sendEmail = () => {
     font-size: 2rem;
     letter-spacing: 0.02em;
   }
+}
+
+.info-item p .hover-text {
+  position: absolute;
+  bottom: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(30, 144, 255, 0.9);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  opacity: 0;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.info-item.clickable:hover p .hover-text {
+  opacity: 1;
+  bottom: -40px;
+}
+
+.info-item {
+  position: relative;
+}
+
+.info-item p i {
+  display: none;
+}
+
+.service-image img,
+.product-image img,
+.modal-product-image,
+.about-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+@supports (content-visibility: auto) {
+  .service-image,
+  .product-image,
+  .about-image {
+    content-visibility: auto;
+    contain-intrinsic-size: 300px;
+  }
+}
+
+/* Performans optimizasyonları için ek stiller */
+.service-image,
+.product-image,
+.about-image {
+  background-color: #f8f9fa;
+  position: relative;
+  overflow: hidden;
+}
+
+.service-image::before,
+.product-image::before,
+.about-image::before {
+  content: "";
+  display: block;
+  padding-top: 66.67%; /* 3:2 aspect ratio */
+}
+
+.service-image img,
+.product-image img,
+.about-image img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+  transition: opacity 0.3s ease;
+}
+
+img[data-src] {
+  opacity: 0;
+}
+
+img:not([data-src]) {
+  opacity: 1;
+}
+
+/* Modern loading animasyonu */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.service-image::after,
+.product-image::after,
+.about-image::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.2) 20%,
+    rgba(255, 255, 255, 0.5) 60%,
+    rgba(255, 255, 255, 0)
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.service-image:not(:has(img[src])):after,
+.product-image:not(:has(img[src])):after,
+.about-image:not(:has(img[src])):after {
+  opacity: 1;
+}
+
+/* Önbelleğe alma için stil */
+.preload-image {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 </style> 

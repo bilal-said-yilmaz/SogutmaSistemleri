@@ -16,9 +16,10 @@
     <!-- Forgot Password Form -->
     <div v-else class="login-form">
       <h2>Şifre Yenileme</h2>
-      <!-- Phone Number Input Step -->
+      <!-- Username and Email Input Step -->
       <form v-if="forgotPasswordStep === 1" @submit.prevent="sendVerificationCode">
-        <input v-model="forgotPasswordForm.phone" type="tel" placeholder="Telefon Numarası (5XX XXX XX XX)" required pattern="[0-9]{10}">
+        <input v-model="forgotPasswordForm.username" type="text" placeholder="Kullanıcı Adı" required>
+        <input v-model="forgotPasswordForm.email" type="email" placeholder="E-posta Adresi" required>
         <button type="submit">Doğrulama Kodu Gönder</button>
         <button type="button" @click="toggleForgotPassword" class="mt-3" style="background: #6c757d;">Geri Dön</button>
       </form>
@@ -37,6 +38,7 @@
                  pattern="[0-9]"
                  required>
         </div>
+        <p class="verification-info">E-posta adresinize gönderilen 6 haneli kodu giriniz.</p>
         <div class="resend-code">
           <button type="button" @click="resendCode" :disabled="resendTimer > 0">
             Kodu Tekrar Gönder
@@ -78,7 +80,8 @@ const form = ref({
 const showForgotPassword = ref(false)
 const forgotPasswordStep = ref(1)
 const forgotPasswordForm = ref({
-  phone: '',
+  username: '',
+  email: '',
   newPassword: '',
   confirmPassword: ''
 })
@@ -111,7 +114,8 @@ const toggleForgotPassword = () => {
   errorMessage.value = ''
   successMessage.value = ''
   forgotPasswordForm.value = {
-    phone: '',
+    username: '',
+    email: '',
     newPassword: '',
     confirmPassword: ''
   }
@@ -120,22 +124,17 @@ const toggleForgotPassword = () => {
 
 const sendVerificationCode = async () => {
   try {
-    // Format phone number
-    const phoneNumber = forgotPasswordForm.value.phone.replace(/\D/g, '')
-    if (phoneNumber.length !== 10) {
-      throw new Error('Geçerli bir telefon numarası giriniz (5XX XXX XX XX)')
-    }
-
     await axios.post('/api/auth/forgot-password', {
-      phone: phoneNumber
+      username: forgotPasswordForm.value.username,
+      email: forgotPasswordForm.value.email
     })
     
     forgotPasswordStep.value = 2
     startResendTimer()
-    successMessage.value = 'Doğrulama kodu telefonunuza gönderildi'
+    successMessage.value = 'Doğrulama kodu e-posta adresinize gönderildi'
     errorMessage.value = ''
   } catch (error) {
-    errorMessage.value = error.response?.data?.message || error.message
+    errorMessage.value = error.response?.data?.message || 'Kullanıcı adı veya e-posta adresi hatalı'
     successMessage.value = ''
   }
 }
@@ -164,7 +163,8 @@ const verifyCode = async () => {
     }
 
     await axios.post('/api/auth/verify-code', {
-      phone: forgotPasswordForm.value.phone,
+      username: forgotPasswordForm.value.username,
+      email: forgotPasswordForm.value.email,
       code: code
     })
     
@@ -184,7 +184,8 @@ const resetPassword = async () => {
     }
 
     await axios.post('/api/auth/reset-password', {
-      phone: forgotPasswordForm.value.phone,
+      username: forgotPasswordForm.value.username,
+      email: forgotPasswordForm.value.email,
       password: forgotPasswordForm.value.newPassword
     })
     
@@ -359,5 +360,12 @@ const onCodeDelete = (event, index) => {
 
 .mt-3 {
   margin-top: 1rem;
+}
+
+.verification-info {
+  text-align: center;
+  color: #666;
+  margin: 1rem 0;
+  font-size: 0.9rem;
 }
 </style> 

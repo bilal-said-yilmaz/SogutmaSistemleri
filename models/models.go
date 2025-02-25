@@ -25,7 +25,6 @@ type About struct {
 type Contact struct {
 	ID            int     `json:"id"`
 	Title         string  `json:"title"`
-	Phone         string  `json:"phone"`
 	Email         string  `json:"email"`
 	Address       string  `json:"address"`
 	Latitude      float64 `json:"latitude"`
@@ -51,9 +50,10 @@ type Footer struct {
 }
 
 type User struct {
-	ID       int    `json:"id"`
-	Username string `json:"username"`
-	Phone    string `json:"phone"`
-	Password string `json:"password,omitempty"`
-	RoleID   int    `json:"role_id"`
+	ID        int    `json:"id"`
+	Username  string `json:"username"`
+	Email     string `json:"email"`
+	Password  string `json:"password,omitempty"`
+	RoleID    int    `json:"role_id"`
+	CreatedAt string `json:"created_at,omitempty"`
 }
